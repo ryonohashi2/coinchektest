@@ -1,0 +1,334 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Design System/Component Guidelines" />
+
+# コンポーネントガイドライン
+
+このドキュメントでは、Finance Dashboardアプリケーションのコンポーネント作成・使用に関するガイドラインを定義します。
+
+## Atomic Design 構造
+
+### Atoms（原子）
+最小単位のUIコンポーネント。単独で機能し、他のコンポーネントの基礎となります。
+
+**例**: Button, Input, Label, Icon, Badge
+
+**特徴**:
+- 単一の責任を持つ
+- プロパティによる設定が可能
+- 再利用性が高い
+- ビジネスロジックを含まない
+
+```tsx
+// 良い例
+interface ButtonProps {
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  onClick?: () => void;
+}
+
+// 悪い例 - 複数の責任を持っている
+interface ButtonProps {
+  children: React.ReactNode;
+  userData: User;
+  onSaveUser: (user: User) => void;
+}
+```
+
+### Molecules（分子）
+複数のAtomsを組み合わせた、より複雑なコンポーネント。
+
+**例**: SearchBox, Card, FormField, AssetCard
+
+**特徴**:
+- 複数のAtomsを組み合わせ
+- 特定の機能を提供
+- 限定的なビジネスロジックを含む場合がある
+
+```tsx
+// 良い例
+interface AssetCardProps {
+  asset: Asset;
+  onSelect?: (asset: Asset) => void;
+  showDetails?: boolean;
+}
+
+const AssetCard: React.FC<AssetCardProps> = ({ asset, onSelect, showDetails }) => {
+  return (
+    <Card>
+      <Icon name={asset.symbol} />
+      <Text variant="heading">{asset.name}</Text>
+      <Text variant="body">{formatCurrency(asset.value)}</Text>
+      {showDetails && <AssetDetails asset={asset} />}
+      <Button onClick={() => onSelect?.(asset)}>選択</Button>
+    </Card>
+  );
+};
+```
+
+### Organisms（有機体）
+複数のMoleculesやAtomsを組み合わせた、複雑なコンポーネント。
+
+**例**: Header, PortfolioSummary, AssetList, Navigation
+
+**特徴**:
+- ページの主要セクションを構成
+- ビジネスロジックを含む
+- 状態管理を行う場合がある
+
+```tsx
+// 良い例
+interface PortfolioSummaryProps {
+  data: PortfolioSummary;
+  onAssetClick?: (assetId: string) => void;
+  loading?: boolean;
+}
+
+const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ 
+  data, 
+  onAssetClick, 
+  loading 
+}) => {
+  if (loading) return <LoadingSpinner />;
+  
+  return (
+    <Card>
+      <Heading level={2}>ポートフォリオサマリー</Heading>
+      <TotalValue value={data.totalValue} />
+      <AssetList 
+        assets={data.assets} 
+        onAssetClick={onAssetClick} 
+      />
+    </Card>
+  );
+};
+```
+
+## コンポーネント作成ルール
+
+### 1. 命名規則
+- **PascalCase**を使用
+- 機能を明確に表現する名前
+- 省略形は避ける
+
+```tsx
+// 良い例
+PortfolioSummary
+AssetDetailCard
+PriceHistoryChart
+
+// 悪い例
+PS
+AssetDC
+PHChart
+```
+
+### 2. Props設計
+- **TypeScript**で型定義を必須とする
+- オプショナルなプロパティには`?`を使用
+- デフォルト値を適切に設定
+
+```tsx
+interface ComponentProps {
+  // 必須プロパティ
+  data: Asset[];
+  
+  // オプショナルプロパティ
+  title?: string;
+  loading?: boolean;
+  onSelect?: (item: Asset) => void;
+  
+  // バリアント
+  variant?: 'default' | 'compact' | 'detailed';
+  size?: 'sm' | 'md' | 'lg';
+}
+
+const Component: React.FC<ComponentProps> = ({
+  data,
+  title = 'デフォルトタイトル',
+  loading = false,
+  variant = 'default',
+  size = 'md',
+  onSelect,
+}) => {
+  // コンポーネント実装
+};
+```
+
+### 3. スタイリング
+- **Tailwind CSS**を使用
+- 条件付きスタイルには`clsx`または`classnames`を使用
+- カスタムCSSは最小限に抑制
+
+```tsx
+import clsx from 'clsx';
+
+const Button: React.FC<ButtonProps> = ({ 
+  variant = 'primary', 
+  size = 'md', 
+  disabled = false,
+  children 
+}) => {
+  const baseClasses = 'font-medium rounded focus:outline-none focus:ring-2';
+  
+  const variantClasses = {
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
+    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+  };
+  
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-base',
+    lg: 'px-6 py-3 text-lg',
+  };
+  
+  return (
+    <button
+      className={clsx(
+        baseClasses,
+        variantClasses[variant],
+        sizeClasses[size],
+        disabled && 'opacity-50 cursor-not-allowed'
+      )}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+```
+
+### 4. アクセシビリティ
+- 適切なARIAラベルを設定
+- キーボードナビゲーションに対応
+- セマンティックなHTMLを使用
+
+```tsx
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      className={clsx(
+        'fixed inset-0 z-50',
+        isOpen ? 'block' : 'hidden'
+      )}
+    >
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
+      <div className="relative bg-white rounded-lg p-6">
+        <h2 id="modal-title" className="text-xl font-semibold mb-4">
+          {title}
+        </h2>
+        {children}
+        <button
+          onClick={onClose}
+          aria-label="モーダルを閉じる"
+          className="absolute top-4 right-4"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+};
+```
+
+## 状態管理
+
+### 1. ローカル状態
+- `useState`を使用
+- 単一コンポーネント内でのみ使用される状態
+
+### 2. 共有状態
+- Context APIまたは状態管理ライブラリを使用
+- 複数コンポーネント間で共有される状態
+
+### 3. サーバー状態
+- SWRまたはReact Queryを使用
+- APIから取得されるデータの管理
+
+## エラーハンドリング
+
+### 1. Error Boundary
+- コンポーネントレベルでのエラーキャッチ
+- ユーザーフレンドリーなエラー表示
+
+### 2. 条件付きレンダリング
+- データの存在チェック
+- 適切なフォールバック表示
+
+```tsx
+const AssetList: React.FC<AssetListProps> = ({ assets, loading, error }) => {
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error.message} />;
+  if (!assets || assets.length === 0) return <EmptyState />;
+  
+  return (
+    <div className="space-y-4">
+      {assets.map(asset => (
+        <AssetCard key={asset.id} asset={asset} />
+      ))}
+    </div>
+  );
+};
+```
+
+## テスト
+
+### 1. 単体テスト
+- React Testing Libraryを使用
+- ユーザーの操作をシミュレート
+- アクセシビリティのテスト
+
+### 2. Storybookテスト
+- 各状態のビジュアルテスト
+- インタラクションテスト
+- アクセシビリティテスト
+
+## パフォーマンス
+
+### 1. メモ化
+- `React.memo`で不要な再レンダリングを防止
+- `useMemo`、`useCallback`で計算結果をキャッシュ
+
+### 2. 遅延読み込み
+- `React.lazy`でコンポーネントの遅延読み込み
+- 画像の遅延読み込み
+
+### 3. バンドルサイズ
+- 不要なライブラリの削除
+- Tree shakingの活用
+
+## ドキュメント
+
+### 1. Storybook
+- 各コンポーネントのストーリーを作成
+- プロパティの説明を記載
+- 使用例を提供
+
+### 2. JSDoc
+- 複雑な関数にはJSDocコメントを追加
+- プロパティの説明を記載
+
+```tsx
+/**
+ * 資産の価格履歴を表示するチャートコンポーネント
+ * 
+ * @param data - 価格履歴データの配列
+ * @param timeRange - 表示する時間範囲（'1d' | '7d' | '30d' | '1y'）
+ * @param showVolume - 取引量を表示するかどうか
+ * @param onDataPointClick - データポイントクリック時のコールバック
+ */
+interface PriceChartProps {
+  data: PriceHistoryPoint[];
+  timeRange?: '1d' | '7d' | '30d' | '1y';
+  showVolume?: boolean;
+  onDataPointClick?: (point: PriceHistoryPoint) => void;
+}
+```
+
+このガイドラインに従って、一貫性があり、保守しやすく、アクセシブルなコンポーネントを作成してください。
